@@ -2,8 +2,9 @@ const { Plugin, PluginSettingTab, Setting, Notice } = require('obsidian');
 
 const DEFAULT_SETTINGS = {
     characterLimit: 1300,
-    countMethod: 'raw', // 'raw' or 'stripped' (removes markdown)
-    showWarningAt: 90 // percentage (90% = warning at 1170/1300)
+    countMethod: 'raw',
+    showWarningAt: 90,
+    trackedFiles: [] // Store tracked file paths persistently
 };
 
 module.exports = class CharacterLimiterPlugin extends Plugin {
@@ -12,14 +13,16 @@ module.exports = class CharacterLimiterPlugin extends Plugin {
         
         this.addSettingTab(new CharacterLimiterSettingTab(this.app, this));
         
-        // Track files created while plugin is active
-        this.trackedFiles = new Set();
+        // Convert array to Set for fast lookups
+        this.trackedFiles = new Set(this.settings.trackedFiles);
         
         // Monitor new file creation
         this.registerEvent(
-            this.app.vault.on('create', (file) => {
+            this.app.vault.on('create', async (file) => {
                 if (file.extension === 'md') {
                     this.trackedFiles.add(file.path);
+                    this.settings.trackedFiles.push(file.path);
+                    await this.saveSettings();
                 }
             })
         );
@@ -204,5 +207,11 @@ class CharacterLimiterSettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     }
                 }));
+        
+        containerEl.createEl('h3', { text: 'Tracked Files' });
+        containerEl.createEl('p', { 
+            text: `Currently tracking ${this.plugin.trackedFiles.size} file(s) created after plugin installation.`,
+            cls: 'setting-item-description'
+        });
     }
 }
